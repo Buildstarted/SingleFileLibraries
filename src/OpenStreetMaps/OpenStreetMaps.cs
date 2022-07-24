@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿//Requires: Microsoft.AspNetCore.Http.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions
+//or: Microsoft.AspNetCore.App
+
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,7 +10,7 @@ public class OpenStreetMapsOptions
 {
     public int DefaultZoom { get; set; } = 12;
     public string TileServerTemplate { get; set; } = "https://tile.openstreetmap.org/{0}/{1}/{2}.png";
-    public (int X, int Y) MarkerOffset { get; set; } = (0, 0);
+    public MarkerAnchor MarkerAnchor { get; set; }
     public string Marker { get; set; } = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAnCAMAAADNRxOMAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAJcEhZcwAACxMAAAsTAQCanBgAAAIlUExURUdwTDMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzQ0NDQ0NDMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM////2vbdHXdfm3cdnPdfHDceX/gh3rfgoLhiofijoDgiIzjk4/kljU1NZ3no43jlLe3t+Li4lrXZOnp6XjegF7YaKGhoTg4OHLde+fn503UWGPZbUPRT13YZ0XSUWjacYWFhVvXZX19fT09PcXFxf39/W9vb2FhYampqe7u7kZGRoyMjKLjuVDVW6urq2/ceFBQUPX99klJSUFBQa2trTo6Ov3//YXhjUtLS9bW1j8/P8HBwZrmoGrbc1LVXYKCgl5eXrm5uZLkmWpqamNjY9nZ2dvb28jIyMrKyknKcEzMc1xcXPj4+KSkpKXjvpzkrMTu0azpt+r662facPv++5fhrOv67JXgrVbWYUDRTK/qunvfg9HR0U7UWVPVXtDy2nPdfXPUm/z+/vj9+ZPkm5PdspXlnMDtzUbSUoHYo67pusbv0KvlxK/owmLZbGXab9Dx3G3XhIbglHDWjff99/7//vz+/ErTVVbVZdL015znokjTU/r++lLPc13Yabjpzcrw05DgpVjWYsbu1VXWYMPwyJPct4Lcml7Qgn7ejV/UdY7goVHQbmXVfVLTZlPOePPz83t7e4CAgIu15LQAAAAkdFJOUwA8igxyeHsDXaW3SzmrOZMYLZkwY0ixP6jPutK9RTMVAmZgWo/J8TYAAAHkSURBVBgZjcH1QxoBGAbgDwQO7G5dvUe4id5Gd9rd3Z3r3lx3d3d3/32DExkc/LDnoTCmdNOGjaUUIy+fW/7t+7PM5edRJJFiYvIXeJMTChGFSbp1wPspk8n09e0z6LolFCLr0OPqbc+Y3+9/9/TRdeg7ZMSTdxnR4jLY+qeejFRqbzguw9glpwCGO9Z3oNVpGtnKu2A7cfoMOIaIZON9R4/sY8srQ1bYsTv3xmVEDGd8YHCzrFIb0s56Xa+MHEOiGbx0sAEqtTLApmJZ9s1HzIhIbMFnAxvN+xMWMRUv4ItTJbCIhWIqmsO3UY3AEuaKqGAWP1RqgSXMFlDhPL57lQKLmC8ksQUfXmyOpvkEi5hKpoHnZdHcrzFdQgxnx92bWyKpHz4GxxBJfbh1SVP+j9Zw7b5PSgG5w7jiaa9YU+Y+j+FcCsoZ0uPicWf/tqCKUde5s/qhHOJJBgaBQ45Ws9l82HPqZOfggIRCsnt7sH/v7p0tu/Yc7ERPbzaFZWW2YU1bZhZFyLDascpuzaAo0masapZStPSmWvCa0kkgsQZBNYkkJK9CUJWchBKqtyOgOoFiKHQAdAqKlVQHoC6JYjFcIxo5huJIa0BDGsWTXF9bn0xxpexIofhSrakU3/p19F/+AlDxiLGG8f2uAAAAAElFTkSuQmCC";
 }
 
@@ -139,7 +141,7 @@ public class OpenStreetMapsTagHelper : TagHelper
             var percentagex = (offset.X * 100 / TileSize);
             var percentagey = (offset.Y * 100 / TileSize);
 
-            output.Content.AppendHtml($@"<img style=""z-index: 99999; position: absolute; top: calc({percentagey}% - {options.MarkerOffset.Y}px); left: calc({percentagex}% - {options.MarkerOffset.X}px);"" src=""{options.Marker}"" />");
+            output.Content.AppendHtml($@"<img style=""z-index: 99999; position: absolute; top: calc({percentagey}% - {options.MarkerAnchor.Y}px); left: calc({percentagex}% - {options.MarkerAnchor.X}px);"" src=""{options.Marker}"" />");
         }
         output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[5].X, tiles[5].Y)}"" /></div>");
         output.Content.AppendHtml("</div>");
@@ -192,5 +194,17 @@ public struct TilePosition
         X = x;
         Y = y;
         Zoom = zoom;
+    }
+}
+
+public struct MarkerAnchor
+{
+    public int X { get; }
+    public int Y { get; }
+
+    public MarkerAnchor(int x, int y)
+    {
+        X = x;
+        Y = y;
     }
 }
