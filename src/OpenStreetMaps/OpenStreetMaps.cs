@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Razor.TagHelpers;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace OpenStreetMaps;
@@ -42,11 +40,11 @@ public static class OpenStreetMapExtensions
 
 public class OpenStreetMaps
 {
-    public (TilePosition[] Tiles, double MarkerOffsetX, double MarkerOffsetY, int Zoom) GetTileCenterAndOffset(double lat, double lon, int zoom)
+    public (TilePosition[] Tiles, MarkerOffsetFromTile MarkerOffset, int Zoom) GetTilesAroundCenterAndOffset(double lat, double lon, int zoom)
     {
         var pos = GetPosition(lat, lon, zoom);
         var gps = GetGpsFromTile(pos.X, pos.Y, pos.Zoom);
-        var offset = GetOffset(lat, lon, gps.Lat, gps.Lon, zoom);
+        var offset = GetOffset(lat, lon, gps.Latitude, gps.Longitude, zoom);
 
         var tiles = new TilePosition[] {
             new TilePosition(pos.X - 1, pos.Y - 1, zoom), new TilePosition(pos.X, pos.Y - 1, zoom), new TilePosition(pos.X + 1, pos.Y - 1, zoom),
@@ -54,10 +52,10 @@ public class OpenStreetMaps
             new TilePosition(pos.X - 1, pos.Y + 1, zoom), new TilePosition(pos.X, pos.Y + 1, zoom), new TilePosition(pos.X + 1, pos.Y + 1, zoom),
         };
 
-        return (tiles, offset.X, offset.Y, zoom);
+        return (tiles, offset, zoom);
     }
 
-    public (double Lat, double Lon, int Zoom) GetGpsFromTile(int x, int y, int zoom)
+    public GpsPosition GetGpsFromTile(int x, int y, int zoom)
     {
         zoom = Math.Min(14, Math.Max(1, zoom));
 
@@ -66,10 +64,10 @@ public class OpenStreetMaps
         double n = Math.PI - 2.0 * Math.PI * y / (double)(1 << zoom);
         var lat = 180 / Math.PI * Math.Atan(.5 * (Math.Exp(n) - Math.Exp(-n)));
 
-        return (lat, lon, zoom);
+        return new GpsPosition(lat, lon, zoom);
     }
 
-    public (int X, int Y, int Zoom) GetOffset(double lat1, double lon1, double lat2, double lon2, int zoom)
+    public MarkerOffsetFromTile GetOffset(double lat1, double lon1, double lat2, double lon2, int zoom)
     {
         var result1 = GetPosition(lat1, lon1, zoom);
         var result2 = GetPosition(lat2, lon2, zoom);
@@ -77,7 +75,7 @@ public class OpenStreetMaps
         var x = (int)((result1.X - result2.X) * 256);
         var y = (int)((result1.Y - result2.Y) * 256);
 
-        return (x, y, zoom);
+        return new MarkerOffsetFromTile(x, y);
     }
 
     public TilePosition GetPosition(double lat, double lon, int zoom)
@@ -93,20 +91,6 @@ public class OpenStreetMaps
         var y = (int)Math.Floor(((1 - Math.Log(Math.Tan(latrad) + 1 / Math.Cos(latrad)) / Math.PI) / 2 * n));
 
         return new TilePosition(x, y, zoom);
-    }
-}
-
-public struct TilePosition
-{
-    public int X { get; }
-    public int Y { get; }
-    public int Zoom { get; }
-
-    public TilePosition(int x, int y, int zoom)
-    {
-        X = x;
-        Y = y;
-        Zoom = zoom;
     }
 }
 
@@ -139,10 +123,10 @@ public class OpenStreetMapsTagHelper : TagHelper
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
-        var mapinfo = osm.GetTileCenterAndOffset(Latitude, Longitude, Zoom);
+        var mapinfo = osm.GetTilesAroundCenterAndOffset(Latitude, Longitude, Zoom);
 
-        var percentagex = (mapinfo.MarkerOffsetX * 100 / 256);
-        var percentagey = (mapinfo.MarkerOffsetY * 100 / 256);
+        var percentagex = (mapinfo.MarkerOffset.X * 100 / 256);
+        var percentagey = (mapinfo.MarkerOffset.Y * 100 / 256);
 
         output.TagName = "div";
         output.Attributes.Add("class", "osm-map");
@@ -171,5 +155,45 @@ public class OpenStreetMapsTagHelper : TagHelper
         output.Content.AppendHtml("</div>");
 
         output.TagMode = TagMode.StartTagAndEndTag;
+    }
+}
+
+public struct GpsPosition
+{
+    public double Latitude { get; }
+    public double Longitude { get; }
+    public int Zoom { get; }
+
+    public GpsPosition(double latitude, double longitude, int zoom)
+    {
+        Latitude = latitude;
+        Longitude = longitude;
+        Zoom = zoom;
+    }
+}
+
+public struct MarkerOffsetFromTile
+{
+    public int X { get; }
+    public int Y { get; }
+
+    public MarkerOffsetFromTile(int x, int y)
+    {
+        X = x;
+        Y = y;
+    }
+}
+
+public struct TilePosition
+{
+    public int X { get; }
+    public int Y { get; }
+    public int Zoom { get; }
+
+    public TilePosition(int x, int y, int zoom)
+    {
+        X = x;
+        Y = y;
+        Zoom = zoom;
     }
 }
