@@ -23,19 +23,6 @@ public static class OpenStreetMapExtensions
 
         return collection;
     }
-
-    public static IApplicationBuilder UseOpenStreetMaps(this IApplicationBuilder builder)
-    {
-        var osm = builder.ApplicationServices.GetService<OpenStreetMaps>();
-        var options = builder.ApplicationServices.GetService<OpenStreetMapsOptions>();
-
-        if (osm == null || options == null)
-        {
-            throw new Exception("Unable to use OpenStreetMaps. Must call AddOpenStreetMaps first.");
-        }
-
-        return builder;
-    }
 }
 
 public class OpenStreetMaps
