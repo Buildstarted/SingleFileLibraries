@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MaxMindGeoIpMiddleware", "MaxMindGeoIpMiddleware\MaxMindGeoIpMiddleware.csproj", "{9BE6E4CC-0A72-4F1C-A0B7-15187F980B5E}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenStreetMaps", "OpenStreetMaps\OpenStreetMaps.csproj", "{5D9D9CD1-593C-4BFC-B761-A10DC97BCA93}"
 EndProject
 Global
