@@ -40,11 +40,9 @@ public static class OpenStreetMapExtensions
 
 public class OpenStreetMaps
 {
-    public (TilePosition[] Tiles, MarkerOffsetFromTile MarkerOffset, int Zoom) GetTilesAroundCenterAndOffset(double lat, double lon, int zoom)
+    public TilePosition[] GetTiles(double lat, double lon, int zoom)
     {
         var pos = GetPosition(lat, lon, zoom);
-        var gps = GetGpsFromTile(pos.X, pos.Y, pos.Zoom);
-        var offset = GetOffset(lat, lon, gps.Latitude, gps.Longitude, zoom);
 
         var tiles = new TilePosition[] {
             new TilePosition(pos.X - 1, pos.Y - 1, zoom), new TilePosition(pos.X, pos.Y - 1, zoom), new TilePosition(pos.X + 1, pos.Y - 1, zoom),
@@ -52,7 +50,16 @@ public class OpenStreetMaps
             new TilePosition(pos.X - 1, pos.Y + 1, zoom), new TilePosition(pos.X, pos.Y + 1, zoom), new TilePosition(pos.X + 1, pos.Y + 1, zoom),
         };
 
-        return (tiles, offset, zoom);
+        return tiles;
+    }
+
+    public MarkerOffsetFromTile GetMarkerPosition(double lat, double lon, int zoom)
+    {
+        var pos = GetPosition(lat, lon, zoom);
+        var gps = GetGpsFromTile(pos.X, pos.Y, pos.Zoom);
+        var offset = GetOffset(lat, lon, gps.Latitude, gps.Longitude, zoom);
+
+        return offset;
     }
 
     public GpsPosition GetGpsFromTile(int x, int y, int zoom)
@@ -67,30 +74,30 @@ public class OpenStreetMaps
         return new GpsPosition(lat, lon, zoom);
     }
 
-    public MarkerOffsetFromTile GetOffset(double lat1, double lon1, double lat2, double lon2, int zoom)
+    public TilePosition GetPosition(double latitude, double longitude, int zoom)
     {
-        var result1 = GetPosition(lat1, lon1, zoom);
-        var result2 = GetPosition(lat2, lon2, zoom);
+        zoom = Math.Min(14, Math.Max(1, zoom));
+
+        double lonrad = (longitude * Math.PI) / 180;
+        double latrad = (latitude * Math.PI) / 180;
+
+        var n = 1 << zoom;
+
+        var x = (int)Math.Floor(((longitude + 180) / 360) * n);
+        var y = (int)Math.Floor(((1 - Math.Log(Math.Tan(latrad) + 1 / Math.Cos(latrad)) / Math.PI) / 2 * n));
+
+        return new TilePosition(x, y, zoom);
+    }
+
+    private MarkerOffsetFromTile GetOffset(double latitude1, double longitude1, double latitude2, double longitude2, int zoom)
+    {
+        var result1 = GetPosition(latitude1, longitude1, zoom);
+        var result2 = GetPosition(latitude2, longitude2, zoom);
 
         var x = (int)((result1.X - result2.X) * 256);
         var y = (int)((result1.Y - result2.Y) * 256);
 
         return new MarkerOffsetFromTile(x, y);
-    }
-
-    public TilePosition GetPosition(double lat, double lon, int zoom)
-    {
-        zoom = Math.Min(14, Math.Max(1, zoom));
-
-        double lonrad = (lon * Math.PI) / 180;
-        double latrad = (lat * Math.PI) / 180;
-
-        var n = 1 << zoom;
-
-        var x = (int)Math.Floor(((lon + 180) / 360) * n);
-        var y = (int)Math.Floor(((1 - Math.Log(Math.Tan(latrad) + 1 / Math.Cos(latrad)) / Math.PI) / 2 * n));
-
-        return new TilePosition(x, y, zoom);
     }
 }
 
@@ -98,6 +105,7 @@ public class OpenStreetMaps
 [OutputElementHint("div")]
 public class OpenStreetMapsTagHelper : TagHelper
 {
+    private const int TileSize = 256;
     private readonly OpenStreetMaps osm;
     private readonly OpenStreetMapsOptions options;
 
@@ -123,34 +131,36 @@ public class OpenStreetMapsTagHelper : TagHelper
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
-        var mapinfo = osm.GetTilesAroundCenterAndOffset(Latitude, Longitude, Zoom);
-
-        var percentagex = (mapinfo.MarkerOffset.X * 100 / 256);
-        var percentagey = (mapinfo.MarkerOffset.Y * 100 / 256);
+        var tiles = osm.GetTiles(Latitude, Longitude, Zoom);
 
         output.TagName = "div";
         output.Attributes.Add("class", "osm-map");
 
         output.Content.AppendHtml("<div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[0].X, mapinfo.Tiles[0].Y)}"" /></div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[1].X, mapinfo.Tiles[1].Y)}"" /></div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[2].X, mapinfo.Tiles[2].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[0].X, tiles[0].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[1].X, tiles[1].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[2].X, tiles[2].Y)}"" /></div>");
         output.Content.AppendHtml("</div>");
 
         output.Content.AppendHtml("<div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[3].X, mapinfo.Tiles[3].Y)}"" /></div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[4].X, mapinfo.Tiles[4].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[3].X, tiles[3].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[4].X, tiles[4].Y)}"" /></div>");
         if(ShowMarker)
         {
+            var offset = osm.GetMarkerPosition(Latitude, Longitude, Zoom);
+
+            var percentagex = (offset.X * 100 / TileSize);
+            var percentagey = (offset.Y * 100 / TileSize);
+
             output.Content.AppendHtml($@"<img style=""z-index: 99999; position: absolute; top: calc({percentagey}% - {options.MarkerOffset.Y}px); left: calc({percentagex}% - {options.MarkerOffset.X}px);"" src=""{options.Marker}"" />");
         }
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[5].X, mapinfo.Tiles[5].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[5].X, tiles[5].Y)}"" /></div>");
         output.Content.AppendHtml("</div>");
 
         output.Content.AppendHtml("<div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[6].X, mapinfo.Tiles[6].Y)}"" /></div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[7].X, mapinfo.Tiles[7].Y)}"" /></div>");
-        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, mapinfo.Tiles[8].X, mapinfo.Tiles[8].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[6].X, tiles[6].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[7].X, tiles[7].Y)}"" /></div>");
+        output.Content.AppendHtml($@"  <div><img src=""{string.Format(options.TileServerTemplate, Zoom, tiles[8].X, tiles[8].Y)}"" /></div>");
         output.Content.AppendHtml("</div>");
         output.Content.AppendHtml("</div>");
 
