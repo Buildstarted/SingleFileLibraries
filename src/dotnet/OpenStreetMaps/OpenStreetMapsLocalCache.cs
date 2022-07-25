@@ -71,9 +71,8 @@ public static class OpenStreetMapExtensions
                 var z = (string)context.Request.RouteValues["z"];
                 var x = (string)context.Request.RouteValues["x"];
                 var y = (string)context.Request.RouteValues["y"];
-                var mode = (string)context.Request.RouteValues["mode"];
 
-                using var file = await osm.GetTile(z, x, y, mode);
+                using var file = await osm.GetTile(z, x, y);
                 context.Response.ContentType = "image/png";
                 await file.CopyToAsync(context.Response.Body);
             });
@@ -92,7 +91,7 @@ public class OpenStreetMaps
         this.options = options;
     }
 
-    public async Task<Stream> GetTile(string z, string x, string y, string mode)
+    public async Task<Stream> GetTile(string z, string x, string y)
     {
         if (!Directory.Exists($"{options.CachePath}/{z}/{x}"))
         {
