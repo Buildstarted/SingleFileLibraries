@@ -29,7 +29,9 @@ public class LocationMiddleware
             ipvalue = context.Request.HttpContext.Connection.RemoteIpAddress.ToString();
         }
 
-        maxminddb.GetRangeInfo(ipvalue).CopyTo(location);
+        maxminddb.GetLocation(ipvalue).CopyTo(location);
+
+        context.Items["X-GeoIP-Location"] = location;
 
         await next(context);
     }
@@ -86,13 +88,13 @@ public class MaxMindGeoIpDb
         this.options = options;
     }
 
-    public GeoIPLocation GetRangeInfo(string sourceip)
+    public GeoIPLocation GetLocation(string sourceip, string language = "en")
     {
         try
         {
             var block = GetBlockInfo(sourceip);
 
-            var location = GetLocationInfo(block.id);
+            var location = GetLocationInfo(block.id, language);
 
             return new GeoIPLocation(block.isvpn, double.Parse(block.latitude), double.Parse(block.longitude), location.continentname, location.countryname.Replace("\"", ""), location.cityname.Replace("\"", ""), location.sub1code, block.postal.Replace("\"", ""), location.timezone);
         }
@@ -157,9 +159,15 @@ public class MaxMindGeoIpDb
         return null;
     }
 
-    private (string id, string language, string continent, string continentname, string countryiso, string countryname, string sub1code, string sub1iso, string sub2code, string sub2iso, string cityname, string metrocode, string timezone, string eumember) GetLocationInfo(string locationid)
+    private (string id, string language, string continent, string continentname, string countryiso, string countryname, string sub1code, string sub1iso, string sub2code, string sub2iso, string cityname, string metrocode, string timezone, string eumember) GetLocationInfo(string locationid, string language)
     {
-        var result = Find(locationid, options.LocationsPath, (s, s1) =>
+        var path = options.LocationsPath;
+        if(path.Contains("{0}"))
+        {
+            path = String.Format(path, language);
+        }
+
+        var result = Find(locationid, path, (s, s1) =>
         {
             var compare = int.Parse(s) < int.Parse(s1) ? -1 : (int.Parse(s) > int.Parse(s1) ? 1 : 0);
             return compare;
@@ -250,6 +258,8 @@ public class MaxMindGeoIpDb
 
         return -1;
     }
+
+    //TODO add IPv6 support
 }
 
 public class GeoIPLocation
