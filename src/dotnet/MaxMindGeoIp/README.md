@@ -3,7 +3,7 @@
 Download the dataset from [MAXMIND's website](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data). The data is already in a format
 acceptable by this tool. Just copy the files to your system and set the options
 
-```
+```csharp
 
 var options = new MaxMindGeoIpOptions(
 	"c:/geoip/GeoLite2-City-Blocks-IPv4.csv",
