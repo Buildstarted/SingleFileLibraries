@@ -3,7 +3,7 @@ namespace HistoryManager;
 /// <summary>
 /// Undo/Redo functionality
 /// </summary>
-/// <typeparam name="T"></typeparam>
+/// <typeparam name="T">The items to store on the history</typeparam>
 class History<T>
 {
     private List<T> history;
