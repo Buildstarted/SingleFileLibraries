@@ -1,7 +1,7 @@
 ClassApplicatorTagHelper
 ------------------------
 
-ClassApplicatorTagHelper provides a shorter way of toggling a class on an element.
+Inspired by Svelte class shortcuts
 
 ```razor
     class:name="@Model.Value"
@@ -11,9 +11,11 @@ ClassApplicatorTagHelper provides a shorter way of toggling a class on an elemen
     class:name
 ```
 
+ClassApplicatorTagHelper provides a shorter way of toggling a class on an element.
+
 ```razor
     <!-- These are equivalent -->
-    <div class="(@Model.Active ? 'active' : ''}">...</div>
+    <div class="(@Model.Active ? 'active' : '')">...</div>
     <div class:active={@Model.Active}>...</div>
 
     <!-- Shorthand, for when name and value match -->
