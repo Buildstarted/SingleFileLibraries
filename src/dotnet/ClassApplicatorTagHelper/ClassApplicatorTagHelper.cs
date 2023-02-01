@@ -96,8 +96,11 @@ public class ClassApplicatorTagHelper : TagHelper
                 {
                     yield return name;
                 }
-            }
-            else
+            }   
+
+            //by default razor attributes that are set to a value of true
+            //have their name set as the value instead
+            else if (attribute.Name == attribute.Value)
             {
                 yield return name;
             }
