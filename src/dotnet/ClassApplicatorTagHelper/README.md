@@ -3,15 +3,15 @@ ClassApplicatorTagHelper
 
 ClassApplicatorTagHelper provides a shorter way of toggling a class on an element.
 
-```
+```razor
     class:name="@Model.Value"
 ```
 
-```
+```razor
     class:name
 ```
 
-```
+```razor
     <!-- These are equivalent -->
     <div class="(@Model.Active ? 'active' : ''}">...</div>
     <div class:active={@Model.Active}>...</div>
