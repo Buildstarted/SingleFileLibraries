@@ -71,13 +71,13 @@ public class ClassApplicatorTagHelper : TagHelper
         {
             if (modelType is not null && attribute.ValueStyle == HtmlAttributeValueStyle.Minimized)
             {
-                //Support for converting snake/kebab case to camelcase
+                //Support for converting kebab case to camelcase
                 //css classes tend to separate words using a `-`
                 //is-admin -> isadmin
 
-                //TODO(ben): find a more efficient way of handling this
-                var namelookup = name.Replace("-", "").Replace("_", "");
+                var namelookup = name.Replace("-", "");
 
+                //TODO(ben): Look into caching this for better performance
                 var modelProperty = modelType.GetProperty(namelookup, DefaultLookup);
                 var value = modelProperty?.GetValue(model);
 
