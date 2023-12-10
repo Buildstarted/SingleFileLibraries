@@ -2,21 +2,17 @@
 using Microsoft.AspNetCore.Mvc.TagHelpers;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Encodings.Web;
 
 namespace SingleFileLibraries;
 
-[HtmlTargetElement("*")]
+[HtmlTargetElement(Attributes = ClassApplicatorTagHelper.Prefix + "*")]
 public class ClassApplicatorTagHelper : TagHelper
 {
-    private readonly string prefix;
-    private readonly int prefixLength;
+    public const string Prefix = "class:";
+    private const int PrefixLength = 6;
     private readonly HtmlEncoder htmlEncoder;
 
     [ViewContext, HtmlAttributeNotBound]
@@ -24,10 +20,8 @@ public class ClassApplicatorTagHelper : TagHelper
 
     private const BindingFlags DefaultLookup = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase;
 
-    public ClassApplicatorTagHelper(IOptions<ClassApplicatorConfiguration> configuration, HtmlEncoder htmlEncoder)
+    public ClassApplicatorTagHelper(HtmlEncoder htmlEncoder)
     {
-        prefix = configuration.Value.Prefix;
-        prefixLength = prefix.Length;
         this.htmlEncoder = htmlEncoder;
     }
 
@@ -40,8 +34,8 @@ public class ClassApplicatorTagHelper : TagHelper
             //the value of the attribute with the name and if they're the same and they
             //start with the prefix then we're ok
 
-            if (attribute.Name.Length > prefixLength
-                && attribute.Name[0..prefixLength] == prefix)
+            if (attribute.Name.Length > PrefixLength
+                && attribute.Name[0..PrefixLength] == Prefix)
             {
                 //remove the attribute from the element
                 //as it would end up with
@@ -65,7 +59,7 @@ public class ClassApplicatorTagHelper : TagHelper
     {
         var model = ViewContext.ViewData.Model;
         var modelType = model?.GetType();
-        var names = attribute.Name[prefixLength..].Split("|");
+        var names = attribute.Name[PrefixLength..].Split("|");
 
         foreach (var name in names)
         {
@@ -96,7 +90,7 @@ public class ClassApplicatorTagHelper : TagHelper
                 {
                     yield return name;
                 }
-            }   
+            }
 
             //by default razor attributes that are set to a value of true
             //have their name set as the value instead
@@ -106,24 +100,4 @@ public class ClassApplicatorTagHelper : TagHelper
             }
         }
     }
-}
-
-public class ClassApplicatorConfiguration
-{
-    private string prefix;
-    public string Prefix
-    {
-        get => prefix;
-        set
-        {
-            ArgumentException.ThrowIfNullOrEmpty(nameof(prefix));
-
-            if (!value.EndsWith(":")) { value += ":"; }
-            prefix = value;
-        }
-    }
-
-    public ClassApplicatorConfiguration() : this("class:") { }
-
-    public ClassApplicatorConfiguration([NotNull] string prefix) => Prefix = prefix;
 }
