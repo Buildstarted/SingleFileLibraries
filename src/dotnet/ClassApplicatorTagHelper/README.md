@@ -33,16 +33,6 @@ In your `_ViewImports.cshtml` file add:
 @addTagHelper *, SingleFileLibraries
 ```
 
-Settings
---------
-
-If you wish to change the default prefix from `class` to something else like `css` 
-just add a configuration option to your `Startup.cs`
-
-```csharp
-builder.Services.Configure<ClassApplicatorConfiguration>(config => config.Prefix = "css");
-```
-
 Usage
 -----
 
