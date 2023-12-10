@@ -42,6 +42,15 @@ To set a class based on the boolean value of a property on your model
 <span class:is-active="@Model.IsActive">Is active</span>
 ```
 
+Settings
+--------
+
+To change the attribute prefix from `class:` to something else just modify the `Prefix` constant
+
+```csharp
+	public const string Prefix = "class:";
+```
+
 ### Shortcut version
 
 You can also use the shortcut version if the class name and the property name are the same. 

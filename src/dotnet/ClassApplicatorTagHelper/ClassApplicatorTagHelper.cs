@@ -11,8 +11,7 @@ namespace SingleFileLibraries;
 [HtmlTargetElement(Attributes = ClassApplicatorTagHelper.Prefix + "*")]
 public class ClassApplicatorTagHelper : TagHelper
 {
-    public const string Prefix = "class:";
-    private const int PrefixLength = 6;
+    private const string Prefix = "class:";
     private readonly HtmlEncoder htmlEncoder;
 
     [ViewContext, HtmlAttributeNotBound]
@@ -34,8 +33,8 @@ public class ClassApplicatorTagHelper : TagHelper
             //the value of the attribute with the name and if they're the same and they
             //start with the prefix then we're ok
 
-            if (attribute.Name.Length > PrefixLength
-                && attribute.Name[0..PrefixLength] == Prefix)
+            if (attribute.Name.Length > Prefix.Length
+                && attribute.Name[0..Prefix.Length] == Prefix)
             {
                 //remove the attribute from the element
                 //as it would end up with
