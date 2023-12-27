@@ -14,7 +14,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static int AtLeast(this int value, int max) => Math.Max(value, max);
 
@@ -30,7 +30,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static double AtLeast(this double value, double max) => Math.Max(value, max);
 
@@ -46,7 +46,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static float AtLeast(this float value, float max) => Math.Max(value, max);
 
@@ -62,7 +62,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static byte AtLeast(this byte value, byte max) => Math.Max(value, max);
 
@@ -78,7 +78,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static long AtLeast(this long value, long max) => Math.Max(value, max);
 
@@ -94,7 +94,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static ulong AtLeast(this ulong value, ulong max) => Math.Max(value, max);
 
@@ -110,7 +110,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static sbyte AtLeast(this sbyte value, sbyte max) => Math.Max(value, max);
 
@@ -126,7 +126,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static uint AtLeast(this uint value, uint max) => Math.Max(value, max);
 
@@ -142,7 +142,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static short AtLeast(this short value, short max) => Math.Max(value, max);
 
@@ -158,7 +158,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static ushort AtLeast(this ushort value, ushort max) => Math.Max(value, max);
 
@@ -174,7 +174,7 @@ public static class MathMinMaxExtensions
     /// Returns the larger of two values.
     /// </summary>
     /// <param name="value">The value to compare</param>
-    /// <param name="max">The maxiumum value</param>
+    /// <param name="max">The maximum value</param>
     /// <returns>value or max. Whichever is larger.</returns>
     public static decimal AtLeast(this decimal value, decimal max) => Math.Max(value, max);
 }
