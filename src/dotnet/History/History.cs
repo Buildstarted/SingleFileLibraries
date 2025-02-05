@@ -9,18 +9,18 @@ class History<T>
     private List<T> history;
     private int index;
 
-    public History()
+    public History(int capacity = 16)
     {
-        history = new List<T>();
+        history = new List<T>(capacity);
         index = -1;
     }
 
-    public History(T current) : this()
+    public History(T current, int capacity = 16) : this(capacity)
     {
         Push(current);
     }
 
-    public History(IEnumerable<T> items) : this()
+    public History(IEnumerable<T> items, int capacity = 16) : this(capacity)
     {
         foreach (var item in items)
         {
