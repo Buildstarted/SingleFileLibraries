@@ -5,16 +5,18 @@ acceptable by this tool. Just copy the files to your system and set the options
 
 ```csharp
 
-var options = new MaxMindGeoIpOptions(
-	"c:/geoip/GeoLite2-City-Blocks-IPv4.csv",
-	"c:/geoip/GeoLite2-City-Locations-{0}.csv"
-);
+builder.Services.Configure<MaxMindLocationOptions>(options =>
+{
+    options.IPv4BlocksPath = @"c:/geoip/GeoLite2-City-Blocks-IPv4.csv";
+    options.IPv6BlocksPath = @"c:/geoip/GeoLite2-City-Blocks-IPv6.csv";
+    options.LocationsPath = @"c:/geoip/GeoLite2-City-Locations-{0}.csv";
+});
 
-services.AddMaxMindGeoIp(options);
+services.AddMaxMindLocation(options);
 
 
 ```
 
-By adding `{0}` to the locations path you can utilize the language parameter in the `GetLocation` method.
+By adding `{0}` to the locations path you can utilize the language parameter in the `GetLocation` method. The default language if none is provided is `en`.
 
 Please review the license before utilizing this library that can be found [here](https://www.maxmind.com/en/geolite2/eula).

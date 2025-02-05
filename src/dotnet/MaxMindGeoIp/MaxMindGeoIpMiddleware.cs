@@ -1,168 +1,147 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
+﻿//Uncomment this line if your project can be compiled in unsafe mode
+//#define UNSAFE
+namespace SingleFileLibraries;
 
-namespace MaxMindGeoIp;
+using Microsoft.Extensions.Options;
+using System.Net;
 
-public class LocationMiddleware
+public class MaxMindLocationDB
 {
-    private const string XForwardedForHeader = "X-Forwarded-For";
-    private readonly RequestDelegate next;
+    private MaxMindLocationOptions options;
 
-    public LocationMiddleware(RequestDelegate next)
+    public MaxMindLocationDB(IOptions<MaxMindLocationOptions> options)
     {
-        this.next = next;
+        this.options = options.Value;
+
+        ArgumentNullException.ThrowIfNull(this.options.LocationsPath);
+        ArgumentNullException.ThrowIfNull(this.options.IPv4BlocksPath);
+        ArgumentNullException.ThrowIfNull(this.options.IPv6BlocksPath);
     }
 
-    //check if twofactor completed
-    public async Task Invoke(HttpContext context, GeoIPLocation location, MaxMindGeoIpDb maxminddb)
+    public GeoIPLocation GetLocation(IPAddress address, string language = "en")
     {
-        if (location == null)
-        {
-            return;
-        }
+        ArgumentNullException.ThrowIfNull(address);
+        var block = GetBlockInfo(address);
 
-        context.Request.HttpContext.Request.Headers.TryGetValue(XForwardedForHeader, out var ipvalue);
-
-        if (!ipvalue.Any())
-        {
-            ipvalue = context.Request.HttpContext.Connection.RemoteIpAddress.ToString();
-        }
-
-        maxminddb.GetLocation(ipvalue).CopyTo(location);
-
-        context.Items["X-GeoIP-Location"] = location;
-
-        await next(context);
-    }
-}
-
-public static class LocationExtensions
-{
-    public static IServiceCollection AddMaxMindGeoIp(this IServiceCollection services, MaxMindGeoIpOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        services.AddSingleton(context => new MaxMindGeoIpDb(options));
-
-        return services;
-    }
-
-    public static IServiceCollection AddLocationMiddleware(this IServiceCollection services, MaxMindGeoIpOptions options)
-    {
-        services.AddMaxMindGeoIp(options);
-        services.AddScoped<GeoIPLocation>();
-
-        return services;
-    }
-
-    public static IApplicationBuilder UseLocationMiddleware(this IApplicationBuilder builder)
-    {
-        builder.UseMiddleware<LocationMiddleware>();
-
-        return builder;
-    }
-}
-
-public class MaxMindGeoIpOptions
-{
-    public string BlocksPath { get; }
-    public string LocationsPath { get; }
-
-    public MaxMindGeoIpOptions(string blockspath, string locationspath)
-    {
-        ArgumentNullException.ThrowIfNull(blockspath);
-        ArgumentNullException.ThrowIfNull(locationspath);
-
-        BlocksPath = blockspath;
-        LocationsPath = locationspath;
-    }
-}
-
-public class MaxMindGeoIpDb
-{
-    private MaxMindGeoIpOptions options;
-
-    public MaxMindGeoIpDb(MaxMindGeoIpOptions options)
-    {
-        this.options = options;
-    }
-
-    public GeoIPLocation GetLocation(string sourceip, string language = "en")
-    {
-        try
-        {
-            var block = GetBlockInfo(sourceip);
-
-            var location = GetLocationInfo(block.id, language);
-
-            return new GeoIPLocation(block.isvpn, double.Parse(block.latitude), double.Parse(block.longitude), location.continentname, location.countryname.Replace("\"", ""), location.cityname.Replace("\"", ""), location.sub1code, block.postal.Replace("\"", ""), location.timezone);
-        }
-        catch
-        {
-            return new GeoIPLocation(null, 0, 0, null, null, null, null, null, null);
-        }
-    }
-
-    private string Find(string parameter, string path, Func<string, string, int> comparer)
-    {
-        if (!File.Exists(path))
+        if (block == null)
         {
             return null;
         }
 
-        using (var fs = File.OpenRead(path))
+        var location = GetLocationInfo(block.Id, language);
+
+        return new GeoIPLocation(location.Language, location.Continent, location.ContinentName,
+                                 location.CountryISO, location.CountryName, location.Sub1Code,
+                                 location.Sub1ISO, location.Sub2Code, location.Sub2ISO, location.CityName,
+                                 location.MetroCode, location.TimeZone, location.EUMember, block.IPRange,
+                                 block.PostalCode, block.Latitude, block.Longitude, block.IsVPN,
+                                 block.IsSatelliteProvider, block.AccuracyRadius, address.ToString());
+    }
+
+#if UNSAFE 
+    private unsafe string Find<T>(T value, string path, Func<T, string, int> comparer)
+#else
+    private string Find<T>(T value, string path, Func<T, string, int> comparer)
+#endif
+    {
+        if (!File.Exists(path))
         {
-            var low = 0L;
-            // We don't need to start at the very end
-            var high = fs.Length - (40 - 1); // EOF - 1
+            throw new FileNotFoundException("Unable to find MaxMindGeoIP database", path, null);
+        }
 
-            using (var sr = new StreamReader(fs))
+        string result = null;
+        long high;
+        long low;
+        const int BufferSize = 256;
+#if UNSAFE
+        var bufferback = stackalloc char[BufferSize];
+        var lineback = stackalloc char[BufferSize];
+#else
+        var bufferback = new char[BufferSize];
+        var lineback = new char[BufferSize];
+#endif
+
+        using var filestream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None, bufferSize: 1);
+        low = 0;
+        high = filestream.Length - 1;
+
+        using var reader = new StreamReader(filestream);
+        while (low <= high)
+        {
+            var middle = (low + high + 1) / 2;
+            filestream.Seek(middle, SeekOrigin.Begin);
+
+            reader.DiscardBufferedData();
+#if UNSAFE
+            var line = new Span<char>(lineback, BufferSize);
+            var buffer = new Span<char>(bufferback, BufferSize);
+#else
+            var line = new Span<char>(lineback);
+            var buffer = new Span<char>(bufferback);
+#endif
+            var writtenToLine = false;
+            int bytesread;
+
+            while ((bytesread = reader.Read(buffer)) != 0)
             {
-
-                while (low <= high)
+                var newlineindex = buffer.IndexOf<char>('\n');
+                if (newlineindex != -1)
                 {
-                    var middle = (low + high + 1) / 2;
-                    fs.Seek(middle, SeekOrigin.Begin);
+                    buffer = buffer.Slice(newlineindex + 1);
 
-                    // Resync with base stream after seek
-                    sr.DiscardBufferedData();
-
-                    var readLine = sr.ReadLine();
-
-                    // 1) If we are NOT at the beginning of the file, we may have only read a partial line so
-                    //    Read again to make sure we get a full line.
-                    // 2) No sense reading again if we are at the EOF
-                    if ((middle > 0) && (!sr.EndOfStream)) readLine = sr.ReadLine() ?? "";
-
-                    var parts = readLine.Split(',');
-                    var locationcol = parts[0];
-
-                    var compare = comparer(parameter, locationcol);
-
-                    if (compare < 0)
+                    if (writtenToLine)
                     {
-                        high = middle - 1;
-                    }
-                    else if (compare > 0)
-                    {
-                        low = middle + 1;
+                        result = string.Concat(line, buffer);
+                        break;
                     }
                     else
                     {
-                        return readLine;
+                        newlineindex = buffer.IndexOf<char>('\n');
+
+                        if (newlineindex != -1)
+                        {
+                            buffer = buffer.Slice(0, newlineindex);
+                            result = new string(buffer);
+                            break;
+                        }
+                        else
+                        {
+                            buffer.CopyTo(line);
+                            writtenToLine = true;
+                        }
                     }
                 }
             }
+
+            var column = result[0..result.IndexOf(',')];
+
+            var compare = comparer(value, column);
+
+            if (compare < 0)
+            {
+                high = middle - 1;
+            }
+            else if (compare > 0)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                return result;
+            }
         }
 
-        return null;
+        return result;
     }
 
-    private (string id, string language, string continent, string continentname, string countryiso, string countryname, string sub1code, string sub1iso, string sub2code, string sub2iso, string cityname, string metrocode, string timezone, string eumember) GetLocationInfo(string locationid, string language)
+#if UNSAFE
+    private unsafe Location GetLocationInfo(string locationid, string language)
+#else
+    private Location GetLocationInfo(string locationid, string language)
+#endif
     {
         var path = options.LocationsPath;
-        if(path.Contains("{0}"))
+        if (path.Contains("{0}"))
         {
             path = String.Format(path, language);
         }
@@ -175,130 +154,359 @@ public class MaxMindGeoIpDb
 
         if (result != null)
         {
-            var parts = result.Split(",");
-            return (parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], parts[6], parts[7], parts[8], parts[9], parts[10], parts[11], parts[12], parts[13]);
+#if UNSAFE
+            var ranges = stackalloc Range[14];
+            ParseLine(result, ref ranges);
+#else
+            var ranges = ParseLine(result, 14);
+#endif
 
+            var id = result[ranges[0]];
+            var lang = result[ranges[1]];
+            var continent = result[ranges[2]];
+            var countryiso = result[ranges[4]];
+            var sub1code = result[ranges[6]];
+            var sub1iso = result[ranges[7]];
+            var sub2code = result[ranges[8]];
+            var sub2iso = result[ranges[9]];
+            var metrocode = result[ranges[11]];
+            var timezone = result[ranges[12]];
+            var eumember = result[ranges[13]] == "1";
+
+            //special cases that may be wrapped in quotes
+
+            var continentname = result[ranges[3]].Length > 0 && result[ranges[3]][0] == '"'
+                ? result[ranges[3]][1..^1]
+                : result[ranges[3]];
+
+            var countryname = result[ranges[5]].Length > 0 && result[ranges[5]][0] == '"'
+                ? result[ranges[5]][1..^1]
+                : result[ranges[5]];
+
+            var cityname = result[ranges[10]].Length > 0 && result[ranges[10]][0] == '"'
+                ? result[ranges[10]][1..^1]
+                : result[ranges[10]];
+
+            return new Location(id, lang, continent, continentname, countryiso, countryname, sub1code, sub1iso, sub2code, sub2iso, cityname, metrocode, timezone, eumember);
         }
-        return (null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+
+        return null;
     }
 
-    private (string id, string postal, string latitude, string longitude, string isvpn) GetBlockInfo(string sourceip)
+#if UNSAFE
+    private unsafe Block GetBlockInfo(IPAddress address)
+#else
+    private Block GetBlockInfo(IPAddress address)
+#endif
     {
-        var result = Find(sourceip, options.BlocksPath, IsInRange);
+        var path = address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? options.IPv6BlocksPath : options.IPv4BlocksPath;
+
+        var result = Find(address, path, IsInRange);
 
         if (result == null)
         {
             return default;
         }
-        var parts = result.Split(',');
-        return (parts[1], parts[6], parts[7], parts[8], parts[4]);
+
+#if UNSAFE
+        var ranges = stackalloc Range[14];
+        ParseLine(result, ref ranges);
+#else
+        var ranges = ParseLine(result, 10);
+#endif
+
+        var iprange = result[ranges[0]];
+        var id = result[ranges[1]];
+        var isvpn = result[ranges[4]] == "1";
+        var issatelliteprovider = result[ranges[5]] == "1";
+        var postalcode = result[ranges[6]];
+        var latitude = double.Parse(result[ranges[7]]);
+        var longitude = double.Parse(result[ranges[8]]);
+        var accuracy = int.Parse(result[ranges[9]]);
+
+        return new Block(iprange, id, postalcode, latitude, longitude, isvpn, issatelliteprovider, accuracy);
     }
 
-    //ipv4 only
-    private static int IsInRange(string sourceIp, string iprange)
+    private static int IsInRange(IPAddress address, string cidrRange)
     {
-        if (string.IsNullOrWhiteSpace(iprange))
+        //check what type of ip
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
         {
-            return 0;
+            return IsInRangeIPv6(address, cidrRange);
         }
 
-        var sourceparts = sourceIp.Split('.', '/');
-        var sourceipnumber = (Convert.ToUInt32(sourceparts[0]) << 24) |
-                             (Convert.ToUInt32(sourceparts[1]) << 16) |
-                             (Convert.ToUInt32(sourceparts[2]) << 8) |
-                             Convert.ToUInt32(sourceparts[3]);
-
-        try
-        {
-            var parts = iprange.Trim().Split('.', '/');
-
-            for (var i = 0; i < parts.Length; i++)
-            {
-                if (!int.TryParse(parts[i], out var dot))
-                {
-                    throw new Exception("invalid ip address");
-                }
-                else if (dot < 0 || dot > 255)
-                {
-                    throw new Exception("invalid ip address");
-                }
-            }
-
-            var ipnumber = (Convert.ToUInt32(parts[0]) << 24) | (Convert.ToUInt32(parts[1]) << 16) | (Convert.ToUInt32(parts[2]) << 8) | Convert.ToUInt32(parts[3]);
-
-            var mask = 0xffffffff;
-            if (parts.Length == 5)
-            {
-                var maskbits = Convert.ToInt32(parts[4]);
-                mask <<= (32 - maskbits);
-            }
-
-            var ipstart = ipnumber & mask;
-            var ipend = ipnumber | (mask ^ 0xffffffff);
-
-            var start = ipstart;
-            var end = ipend;
-
-            if (sourceipnumber < start)
-            {
-                return -1;
-            }
-
-            if (sourceipnumber > end)
-            {
-                return 1;
-            }
-
-            return 0;
-        }
-        catch
-        {
-            //invalid entry
-        }
-
-        return -1;
+        return IsInRangeIPv4(address, cidrRange);
     }
 
-    //TODO add IPv6 support
+    private static int IsInRangeIPv6(IPAddress address, string cidrRange)
+    {
+        var addressbytes = address.GetAddressBytes();
+        ulong addressupper = ConvertIPv6ToUlong(addressbytes);
+        ulong addresslower = ConvertIPv6ToUlong(addressbytes, sizeof(ulong));
+
+        var suffixstart = cidrRange.IndexOf("/");
+        ulong uppermask = 0;
+        ulong lowermask = 0;
+        if (suffixstart != -1)
+        {
+            byte suffix = byte.Parse(cidrRange[(suffixstart + 1)..]);
+
+            if (suffix > 128 || suffix < 0)
+            {
+                throw new InvalidOperationException($"/{suffix} is invalid for a IPv6 CIDR");
+            }
+
+            if (suffix <= 64)
+            {
+                uppermask = ~(((ulong)1 << (64 - suffix)) - 1);
+                lowermask = ulong.MinValue;
+            }
+            else
+            {
+                uppermask = ulong.MaxValue;
+                lowermask = ~(((ulong)1 << (128 - suffix)) - 1);
+            }
+        }
+
+        var rangeaddress = IPAddress.Parse(cidrRange[0..(suffixstart != -1 ? suffixstart : ^0)]);
+        var rangeaddressbytes = rangeaddress.GetAddressBytes();
+        ulong rangeupper = ConvertIPv6ToUlong(rangeaddressbytes);
+        ulong rangelower = ConvertIPv6ToUlong(rangeaddressbytes, sizeof(ulong));
+
+        ulong startupper = rangeupper & uppermask;
+        ulong startlower = rangelower & lowermask;
+
+        ulong endupper = rangeupper | ~uppermask;
+        ulong endlower = rangelower | ~lowermask;
+
+
+        //TODO find out if this is valid
+        if (addressupper < startupper || addresslower < startlower)
+        {
+            return -1;
+        }
+
+        if (addressupper > endupper || addresslower > endlower)
+        {
+            return 1;
+        }
+
+        return 0;
+
+        static ulong ConvertIPv6ToUlong(byte[] address, int offset = 0)
+        {
+            ulong result = 0;
+
+            for (var i = 0; i < sizeof(ulong); i++)
+            {
+                result |= (ulong)address[i + offset] << ((sizeof(ulong) - i - 1) * 8);
+            }
+
+            return result;
+        }
+    }
+
+    private static int IsInRangeIPv4(IPAddress address, string cidrRange)
+    {
+        if (string.IsNullOrWhiteSpace(cidrRange))
+        {
+            throw new InvalidOperationException("An invalid IP Range was provided.");
+        }
+
+        var addressbytes = address.GetAddressBytes();
+        var sourceipnumber = ((ulong)addressbytes[0] << 24) | ((ulong)addressbytes[1] << 16) | ((ulong)addressbytes[2] << 8) | (ulong)addressbytes[3];
+
+        var suffixstart = cidrRange.IndexOf("/");
+        var mask = 0xffffffff;
+        if (suffixstart != -1)
+        {
+            var suffix = byte.Parse(cidrRange[(suffixstart + 1)..]);
+            if (suffix > 32 || suffix < 0)
+            {
+                throw new InvalidOperationException($"/{suffix} is invalid for a IPv4 CIDR");
+            }
+            mask <<= (32 - suffix);
+        }
+
+        var rangeaddress = IPAddress.Parse(cidrRange[0..(suffixstart != -1 ? suffixstart : ^0)]);
+        var rangebytes = rangeaddress.GetAddressBytes();
+        var rangenumber = ((ulong)rangebytes[0] << 24) | ((ulong)rangebytes[1] << 16) | ((ulong)rangebytes[2] << 8) | (ulong)rangebytes[3];
+
+        var start = rangenumber & mask;
+        var end = rangenumber | (0xffffffff ^ mask);
+
+        if (sourceipnumber < start)
+        {
+            return -1;
+        }
+
+        if (sourceipnumber > end)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private record class Location(string Id, string Language, string Continent, string ContinentName, string CountryISO, string CountryName, string Sub1Code, string Sub1ISO, string Sub2Code, string Sub2ISO, string CityName, string MetroCode, string TimeZone, bool EUMember);
+    private record class Block(string IPRange, string Id, string PostalCode, double Latitude, double Longitude, bool IsVPN, bool IsSatelliteProvider, int AccuracyRadius);
+
+#if UNSAFE
+    unsafe void ParseLine(string line, ref Range* ranges)
+    {
+#else
+    Range[] ParseLine(string line, int columns)
+    {
+        var ranges = new Range[columns];
+#endif
+        var index = 0;
+        var i = 0;
+        while (true)
+        {
+            if (i >= line.Length) break;
+
+            if (line[i] != '"')
+            {
+                //non escaped entry
+                var startpos = i;
+                var endpos = -1;
+                while (true)
+                {
+                    if (i >= line.Length)
+                    {
+                        endpos = i;
+                        break;
+                    }
+
+                    if (line[i] == ',')
+                    {
+                        endpos = i;
+                        i++;
+                        break;
+                    }
+                    i++;
+                }
+                ranges[index++] = new Range(startpos, endpos);
+            }
+            else
+            {
+                //escaped entry
+                var startpos = i + 1;
+                var endpos = -1;
+                while (true)
+                {
+                    if (i >= line.Length)
+                    {
+                        endpos = i;
+                        break;
+                    }
+                    if (line[i] == '"')
+                    {
+                        i++;
+                        if (i >= line.Length)
+                        {
+                            endpos = i;
+                            break;
+                        }
+
+                        if (line[i] == ',')
+                        {
+                            endpos = i - 1;
+                            i++;
+                            break;
+                        }
+                        if (line[i] == '"')
+                        {
+                            //double quotes so not escaped
+                        }
+                    }
+                    i++;
+                }
+
+                ranges[index++] = new Range(startpos, endpos);
+            }
+        }
+
+#if !UNSAFE
+        return ranges;
+#endif
+    }
 }
 
-public class GeoIPLocation
+public class MaxMindLocationOptions
 {
-    public double Latitude { get; private set; }
-    public double Longitude { get; private set; }
-    public string Continent { get; private set; }
-    public string Country { get; private set; }
-    public string City { get; private set; }
-    public string State { get; private set; }
-    public string Postal { get; private set; }
-    public string TimeZone { get; private set; }
-    public string IsVPN { get; private set; }
+    public string IPv4BlocksPath { get; set; }
+    public string IPv6BlocksPath { get; set; }
+    public string LocationsPath { get; set; }
+}
 
-    public GeoIPLocation() { }
 
-    public GeoIPLocation(string isvpn, double latitude, double longitude, string continent, string country, string city, string state, string postal, string timezone)
+public record class GeoIPLocation(string Language, string Continent, string ContinentName, string CountryISO, string CountryName, string Sub1Code, string Sub1ISO, string Sub2Code, string Sub2ISO, string CityName, string MetroCode, string TimeZone, bool EUMember, string IPRange, string PostalCode, double Latitude, double Longitude, bool IsVPN, bool IsSatelliteProvider, int AccuracyRadius, string IPAddress)
+{
+    static GeoIPLocation unknown;
+    public static GeoIPLocation Unknown => unknown ??= new GeoIPLocation("Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown", false, "Unknown", "Unknown", 0, 0, false, false, 0, "Unknown");
+
+    public override string ToString()
     {
-        IsVPN = isvpn;
-        Latitude = latitude;
-        Longitude = longitude;
-        Continent = continent;
-        Country = country;
-        City = city;
-        State = state;
-        Postal = postal;
-        TimeZone = timezone;
+        return $"Country: {CountryName}, State: {Sub1ISO}, City: {CityName}, Postal Code: {PostalCode}, IsVPN: {IsVPN}, AccuracyRadius: {AccuracyRadius}";
+    }
+}
+
+public class MaxMindLocationMiddleware
+{
+    public const string XMaxMindLocationKey = "X-MaxMindGeoIP-Location";
+    private const string XForwardedForHeader = "X-Forwarded-For";
+    private readonly RequestDelegate next;
+    private readonly MaxMindLocationDB maxMindDB;
+
+    public MaxMindLocationMiddleware(RequestDelegate next, MaxMindLocationDB maxMindDB)
+    {
+        this.next = next;
+        this.maxMindDB = maxMindDB;
     }
 
-    public void CopyTo(GeoIPLocation location)
+    public async Task Invoke(HttpContext context)
     {
-        location.IsVPN = this.IsVPN;
-        location.Latitude = this.Latitude;
-        location.Longitude = this.Longitude;
-        location.Continent = this.Continent;
-        location.Country = this.Country;
-        location.City = this.City;
-        location.State = this.State;
-        location.Postal = this.Postal;
-        location.TimeZone = this.TimeZone;
+        IPAddress? address;
+        context.Request.HttpContext.Request.Headers.TryGetValue(XForwardedForHeader, out var ipvalue);
+
+        if (ipvalue.Any())
+        {
+            address = IPAddress.Parse(ipvalue);
+        }
+        else
+        {
+            address = context.Request.HttpContext.Connection.RemoteIpAddress;
+        }
+
+        var location = maxMindDB.GetLocation(address);
+
+        context.Items[XMaxMindLocationKey] = location;
+
+        await next(context);
+    }
+}
+
+public static class MaxMindLocationExtensions
+{
+    public static IServiceCollection AddMaxMindLocation(this IServiceCollection services)
+    {
+        services.AddSingleton<MaxMindLocationDB>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddMaxMindLocationMiddleware(this IServiceCollection services)
+    {
+        services.AddMaxMindLocation();
+
+        return services;
+    }
+
+    public static IApplicationBuilder UseMaxMindLocationMiddleware(this IApplicationBuilder builder)
+    {
+        builder.UseMiddleware<MaxMindLocationMiddleware>();
+
+        return builder;
     }
 }
